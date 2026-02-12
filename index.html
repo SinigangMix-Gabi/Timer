@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FOCUS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --white: #ffffff;
+            --black: #000000;
+            --dim: #444444;
+            --dimmer: #222222;
+        }
+
+        body {
+            background: var(--black);
+            color: var(--white);
+            font-family: 'Share Tech Mono', 'Courier New', monospace;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        /* Scanline overlay for CRT vibe */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(0deg,
+                    transparent,
+                    transparent 2px,
+                    rgba(255, 255, 255, 0.015) 2px,
+                    rgba(255, 255, 255, 0.015) 4px);
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        /* Vignette */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(ellipse at center, transparent 50%, rgba(0, 0, 0, 0.8) 100%);
+            pointer-events: none;
+            z-index: 99;
+        }
+
+        /* ── Timer display ── */
+        #timer-display {
+            font-size: clamp(5rem, 18vw, 12rem);
+            letter-spacing: 0.05em;
+            line-height: 1;
+            transition: opacity 0.15s ease;
+            position: relative;
+        }
+
+        #timer-display.flash {
+            animation: flash-anim 0.15s ease;
+        }
+
+        @keyframes flash-anim {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.1;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+
+        /* Glow when running */
+        #timer-display.running {
+            text-shadow:
+                0 0 20px rgba(255, 255, 255, 0.25),
+                0 0 60px rgba(255, 255, 255, 0.08);
+        }
+
+        /* Dim the colon via CSS targeting */
+        #colon {
+            animation: blink 1s step-start infinite;
+            display: inline-block;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.2;
+            }
+        }
+
+        #colon.paused {
+            animation: none;
+            opacity: 0.3;
+        }
+
+        #colon.stopped {
+            animation: none;
+            opacity: 1;
+        }
+
+        /* ── Mode badge ── */
+        #mode-badge {
+            letter-spacing: 0.3em;
+            font-size: 0.7rem;
+            transition: color 0.3s ease;
+        }
+
+        /* ── Buttons ── */
+        .ctrl-btn {
+            font-family: 'Share Tech Mono', monospace;
+            letter-spacing: 0.25em;
+            font-size: 0.85rem;
+            border: 1px solid var(--dim);
+            color: var(--white);
+            background: transparent;
+            padding: 0.6rem 1.6rem;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.1s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .ctrl-btn:hover {
+            background: var(--white);
+            color: var(--black);
+            border-color: var(--white);
+        }
+
+        .ctrl-btn:active {
+            transform: scale(0.96);
+        }
+
+        .ctrl-btn:disabled {
+            opacity: 0.25;
+            cursor: not-allowed;
+        }
+
+        .ctrl-btn:disabled:hover {
+            background: transparent;
+            color: var(--white);
+            border-color: var(--dim);
+        }
+
+        /* ── Settings panel ── */
+        #settings-panel {
+            border: 1px solid var(--dimmer);
+            padding: 1.5rem 2rem;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+
+        #settings-panel.hidden-panel {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(-8px);
+        }
+
+        .settings-input {
+            font-family: 'Share Tech Mono', monospace;
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid var(--dim);
+            color: var(--white);
+            font-size: 1.4rem;
+            width: 3.5rem;
+            text-align: center;
+            outline: none;
+            padding: 0.2rem 0;
+            transition: border-color 0.2s;
+        }
+
+        .settings-input:focus {
+            border-bottom-color: var(--white);
+        }
+
+        .settings-label {
+            font-size: 0.6rem;
+            letter-spacing: 0.3em;
+            color: var(--dim);
+            text-transform: uppercase;
+        }
+
+        /* ── Progress bar ── */
+        #progress-track {
+            height: 1px;
+            background: var(--dimmer);
+            width: 100%;
+            max-width: 420px;
+            position: relative;
+        }
+
+        #progress-fill {
+            height: 1px;
+            background: var(--white);
+            width: 0%;
+            transition: width 0.5s linear;
+            box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+        }
+
+        /* ── Edit settings link-button ── */
+        #edit-btn {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.65rem;
+            letter-spacing: 0.3em;
+            color: var(--dim);
+            background: none;
+            border: none;
+            cursor: pointer;
+            transition: color 0.2s;
+            text-transform: uppercase;
+            padding: 0;
+        }
+
+        #edit-btn:hover {
+            color: var(--white);
+        }
+
+        /* ── Session dots ── */
+        .session-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--dimmer);
+            border: 1px solid var(--dim);
+            transition: background 0.3s;
+        }
+
+        .session-dot.done {
+            background: var(--white);
+            border-color: var(--white);
+        }
+
+        /* ── Apply settings btn ── */
+        #apply-btn {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.7rem;
+            letter-spacing: 0.2em;
+            background: var(--white);
+            color: var(--black);
+            border: none;
+            padding: 0.5rem 1.2rem;
+            cursor: pointer;
+            transition: opacity 0.15s;
+        }
+
+        #apply-btn:hover {
+            opacity: 0.8;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="flex flex-col items-center gap-8 w-full px-6" style="max-width:640px">
+
+        <!-- MODE BADGE -->
+        <div id="mode-badge" class="text-white tracking-widest uppercase text-xs">
+            ● WORK SESSION
+        </div>
+
+        <!-- TIMER -->
+        <div id="timer-display" class="stopped font-mono text-white select-none">
+            <span id="mm">25</span><span id="colon" class="stopped">:</span><span id="ss">00</span>
+        </div>
+
+        <!-- PROGRESS BAR -->
+        <div id="progress-track">
+            <div id="progress-fill"></div>
+        </div>
+
+        <!-- SESSION DOTS -->
+        <div class="flex gap-3" id="session-dots">
+            <div class="session-dot"></div>
+            <div class="session-dot"></div>
+            <div class="session-dot"></div>
+            <div class="session-dot"></div>
+        </div>
+
+        <!-- CONTROLS -->
+        <div class="flex gap-4 mt-2">
+            <button class="ctrl-btn" id="start-btn" onclick="startTimer()">START</button>
+            <button class="ctrl-btn" id="pause-btn" onclick="pauseTimer()" disabled>PAUSE</button>
+            <button class="ctrl-btn" id="reset-btn" onclick="resetTimer()">RESET</button>
+        </div>
+
+        <!-- EDIT SETTINGS TOGGLE -->
+        <button id="edit-btn" onclick="toggleSettings()">[ EDIT SETTINGS ]</button>
+
+        <!-- SETTINGS PANEL -->
+        <div id="settings-panel" class="hidden-panel w-full">
+            <div class="flex gap-10 justify-center items-end mb-5">
+                <div class="flex flex-col items-center gap-2">
+                    <span class="settings-label">Work (min)</span>
+                    <input class="settings-input" id="work-input" type="number" min="1" max="120" value="25" />
+                </div>
+                <div class="flex flex-col items-center gap-2">
+                    <span class="settings-label">Break (min)</span>
+                    <input class="settings-input" id="break-input" type="number" min="1" max="60" value="5" />
+                </div>
+                <div class="flex flex-col items-center gap-2">
+                    <span class="settings-label">Sessions</span>
+                    <input class="settings-input" id="sessions-input" type="number" min="1" max="8" value="4" />
+                </div>
+            </div>
+            <div class="flex justify-center">
+                <button id="apply-btn" onclick="applySettings()">APPLY</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        /* ─────────────────────────────────────────
+           STATE
+        ───────────────────────────────────────── */
+        let workMinutes = 25;
+        let breakMinutes = 5;
+        let totalSessions = 4;
+
+        let secondsLeft = workMinutes * 60;
+        let totalSeconds = workMinutes * 60;
+        let isRunning = false;
+        let isBreak = false;
+        let interval = null;
+        let sessionsDone = 0;
+
+        /* ─────────────────────────────────────────
+           DOM REFS
+        ───────────────────────────────────────── */
+        const mmEl = document.getElementById('mm');
+        const ssEl = document.getElementById('ss');
+        const colonEl = document.getElementById('colon');
+        const display = document.getElementById('timer-display');
+        const modeBadge = document.getElementById('mode-badge');
+        const progFill = document.getElementById('progress-fill');
+        const startBtn = document.getElementById('start-btn');
+        const pauseBtn = document.getElementById('pause-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const dotsEl = document.getElementById('session-dots');
+        const settPanel = document.getElementById('settings-panel');
+
+        /* ─────────────────────────────────────────
+           RENDER
+        ───────────────────────────────────────── */
+        function render() {
+            const m = Math.floor(secondsLeft / 60);
+            const s = secondsLeft % 60;
+            const mStr = String(m).padStart(2, '0');
+            const sStr = String(s).padStart(2, '0');
+            mmEl.textContent = mStr;
+            ssEl.textContent = sStr;
+
+            // Tab title
+            const label = isBreak ? 'BREAK' : 'WORK';
+            document.title = `${mStr}:${sStr} · ${label}`;
+
+            // Progress bar
+            const pct = ((totalSeconds - secondsLeft) / totalSeconds) * 100;
+            progFill.style.width = pct + '%';
+        }
+
+        function renderDots() {
+            dotsEl.innerHTML = '';
+            for (let i = 0; i < totalSessions; i++) {
+                const d = document.createElement('div');
+                d.className = 'session-dot' + (i < sessionsDone ? ' done' : '');
+                dotsEl.appendChild(d);
+            }
+        }
+
+        /* ─────────────────────────────────────────
+           TIMER CONTROLS
+        ───────────────────────────────────────── */
+        function startTimer() {
+            if (isRunning) return;
+            isRunning = true;
+
+            display.classList.add('running');
+            colonEl.className = ''; // blink
+            startBtn.disabled = true;
+            pauseBtn.disabled = false;
+
+            interval = setInterval(() => {
+                secondsLeft--;
+                render();
+                if (secondsLeft <= 0) {
+                    clearInterval(interval);
+                    isRunning = false;
+                    beep();
+                    flashDisplay();
+                    setTimeout(() => switchMode(), 1500);
+                }
+            }, 1000);
+        }
+
+        function pauseTimer() {
+            if (!isRunning) return;
+            isRunning = false;
+            clearInterval(interval);
+            display.classList.remove('running');
+            colonEl.className = 'paused';
+            startBtn.disabled = false;
+            pauseBtn.disabled = true;
+        }
+
+        function resetTimer() {
+            clearInterval(interval);
+            isRunning = false;
+            isBreak = false;
+            sessionsDone = 0;
+            secondsLeft = workMinutes * 60;
+            totalSeconds = workMinutes * 60;
+
+            display.classList.remove('running');
+            colonEl.className = 'stopped';
+            startBtn.disabled = false;
+            pauseBtn.disabled = true;
+
+            modeBadge.textContent = '● WORK SESSION';
+            modeBadge.style.color = '#ffffff';
+
+            renderDots();
+            render();
+            document.title = 'FOCUS';
+        }
+
+        function switchMode() {
+            if (!isBreak) {
+                // just finished a work session
+                sessionsDone++;
+                renderDots();
+                if (sessionsDone >= totalSessions) {
+                    // all sessions done
+                    modeBadge.textContent = '✓ ALL SESSIONS COMPLETE';
+                    modeBadge.style.color = '#ffffff';
+                    document.title = 'DONE · FOCUS';
+                    colonEl.className = 'stopped';
+                    startBtn.disabled = true;
+                    pauseBtn.disabled = true;
+                    return;
+                }
+                isBreak = true;
+                secondsLeft = breakMinutes * 60;
+                totalSeconds = breakMinutes * 60;
+                modeBadge.textContent = '○ BREAK';
+                modeBadge.style.color = '#888888';
+            } else {
+                isBreak = false;
+                secondsLeft = workMinutes * 60;
+                totalSeconds = workMinutes * 60;
+                modeBadge.textContent = '● WORK SESSION';
+                modeBadge.style.color = '#ffffff';
+            }
+            render();
+            // Auto-start the next phase
+            startBtn.disabled = false;
+            pauseBtn.disabled = false;
+            startTimer();
+        }
+
+        /* ─────────────────────────────────────────
+           SETTINGS
+        ───────────────────────────────────────── */
+        let settingsOpen = false;
+
+        function toggleSettings() {
+            settingsOpen = !settingsOpen;
+            if (settingsOpen) {
+                settPanel.classList.remove('hidden-panel');
+            } else {
+                settPanel.classList.add('hidden-panel');
+            }
+        }
+
+        function applySettings() {
+            const w = parseInt(document.getElementById('work-input').value) || 25;
+            const b = parseInt(document.getElementById('break-input').value) || 5;
+            const s = parseInt(document.getElementById('sessions-input').value) || 4;
+
+            workMinutes = Math.min(Math.max(w, 1), 120);
+            breakMinutes = Math.min(Math.max(b, 1), 60);
+            totalSessions = Math.min(Math.max(s, 1), 8);
+
+            // Sync inputs back to clamped values
+            document.getElementById('work-input').value = workMinutes;
+            document.getElementById('break-input').value = breakMinutes;
+            document.getElementById('sessions-input').value = totalSessions;
+
+            resetTimer();
+            toggleSettings();
+        }
+
+        /* ─────────────────────────────────────────
+           AUDIO — AudioContext beep (3 pulses)
+        ───────────────────────────────────────── */
+        function beep() {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+
+            function pulse(startTime) {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(1480, startTime); // high digital beep
+
+                gain.gain.setValueAtTime(0, startTime);
+                gain.gain.linearRampToValueAtTime(0.35, startTime + 0.01);
+                gain.gain.setValueAtTime(0.35, startTime + 0.12);
+                gain.gain.linearRampToValueAtTime(0, startTime + 0.18);
+
+                osc.start(startTime);
+                osc.stop(startTime + 0.2);
+            }
+
+            pulse(ctx.currentTime);
+            pulse(ctx.currentTime + 0.28);
+            pulse(ctx.currentTime + 0.56);
+        }
+
+        /* ─────────────────────────────────────────
+           VISUAL FLASH on zero
+        ───────────────────────────────────────── */
+        function flashDisplay() {
+            let count = 0;
+            const id = setInterval(() => {
+                display.classList.add('flash');
+                setTimeout(() => display.classList.remove('flash'), 150);
+                count++;
+                if (count >= 3) clearInterval(id);
+            }, 300);
+        }
+
+        /* ─────────────────────────────────────────
+           INIT
+        ───────────────────────────────────────── */
+        renderDots();
+        render();
+    </script>
+</body>
+
+</html>
