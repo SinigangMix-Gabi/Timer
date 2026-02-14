@@ -1,1048 +1,792 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FOCUS</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
-
-        *,
-        *::before,
-        *::after {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        :root {
-            --w: #ffffff;
-            --b: #000000;
-            --dim: #444444;
-            --dimmer: #222222;
-            --mid: #888888;
-        }
-
-        body {
-            background: #000;
-            color: #fff;
-            font-family: 'Share Tech Mono', 'Courier New', monospace;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-        }
-
-        /* CRT scanlines */
-        body::before {
-            content: '';
-            position: fixed;
-            inset: 0;
-            z-index: 100;
-            pointer-events: none;
-            background: repeating-linear-gradient(0deg, transparent, transparent 2px,
-                    rgba(255, 255, 255, 0.013) 2px, rgba(255, 255, 255, 0.013) 4px);
-        }
-
-        /* Vignette */
-        body::after {
-            content: '';
-            position: fixed;
-            inset: 0;
-            z-index: 99;
-            pointer-events: none;
-            background: radial-gradient(ellipse at center, transparent 45%, rgba(0, 0, 0, 0.85) 100%);
-        }
-
-        /* ── Timer ── */
-        #timer-display {
-            font-size: clamp(4.5rem, 18vw, 11rem);
-            letter-spacing: 0.05em;
-            line-height: 1;
-            transition: text-shadow 0.4s;
-            position: relative;
-            user-select: none;
-        }
-
-        #timer-display.running {
-            text-shadow: 0 0 24px rgba(255, 255, 255, 0.22), 0 0 70px rgba(255, 255, 255, 0.07);
-        }
-
-        /* Last 10s pulse */
-        #timer-display.warning {
-            animation: warn 0.45s ease-in-out infinite alternate;
-        }
-
-        @keyframes warn {
-            from {
-                opacity: 1
-            }
-
-            to {
-                opacity: 0.35
-            }
-        }
-
-        /* Finish flash */
-        #timer-display.flash {
-            animation: finish-flash 0.18s ease 3;
-        }
-
-        @keyframes finish-flash {
-
-            0%,
-            100% {
-                opacity: 1
-            }
-
-            50% {
-                opacity: 0.05
-            }
-        }
-
-        /* ── Colon states via class ── */
-        #colon {
-            display: inline-block;
-        }
-
-        #colon.blink {
-            animation: blink 1s step-start infinite;
-        }
-
-        #colon.blink-fast {
-            animation: blink 0.28s step-start infinite;
-        }
-
-        #colon.dimmed {
-            opacity: 0.2;
-        }
-
-        @keyframes blink {
-
-            0%,
-            100% {
-                opacity: 1
-            }
-
-            50% {
-                opacity: 0.12
-            }
-        }
-
-        /* ── Mode badge ── */
-        #mode-badge {
-            letter-spacing: 0.35em;
-            font-size: 0.68rem;
-            transition: color 0.4s;
-            min-height: 1.1em;
-        }
-
-        /* ── Transition countdown ── */
-        #trans-msg {
-            font-size: 0.62rem;
-            letter-spacing: 0.35em;
-            color: var(--mid);
-            min-height: 1.1em;
-            text-align: center;
-        }
-
-        /* ── Progress bar ── */
-        #prog-track {
-            height: 1px;
-            background: var(--dimmer);
-            width: 100%;
-            max-width: 440px;
-        }
-
-        #prog-fill {
-            height: 1px;
-            background: #fff;
-            width: 0%;
-            transition: width 0.6s linear;
-            box-shadow: 0 0 10px rgba(255, 255, 255, 0.55);
-        }
-
-        /* ── Session dots ── */
-        .dot {
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-            background: var(--dimmer);
-            border: 1px solid var(--dim);
-            transition: background 0.35s, border-color 0.35s;
-        }
-
-        .dot.done {
-            background: #fff;
-            border-color: #fff;
-        }
-
-        .dot.active {
-            background: transparent;
-            border-color: #fff;
-            animation: dot-pulse 0.9s ease infinite alternate;
-        }
-
-        @keyframes dot-pulse {
-            from {
-                border-color: #fff;
-                opacity: 1
-            }
-
-            to {
-                border-color: #444;
-                opacity: 0.4
-            }
-        }
-
-        /* ── Control buttons ── */
-        .ctrl-btn {
-            font-family: 'Share Tech Mono', monospace;
-            letter-spacing: 0.25em;
-            font-size: 0.82rem;
-            border: 1px solid var(--dim);
-            color: #fff;
-            background: transparent;
-            padding: 0.58rem 1.5rem;
-            cursor: pointer;
-            transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.1s;
-        }
-
-        .ctrl-btn:hover:not(:disabled) {
-            background: #fff;
-            color: #000;
-            border-color: #fff;
-        }
-
-        .ctrl-btn:active:not(:disabled) {
-            transform: scale(0.95);
-        }
-
-        .ctrl-btn:disabled {
-            opacity: 0.18;
-            cursor: not-allowed;
-        }
-
-        /* RESET confirm state */
-        #reset-btn.confirming {
-            border-color: #fff;
-            color: #fff;
-            animation: confirm-blink 0.55s ease infinite alternate;
-        }
-
-        @keyframes confirm-blink {
-            from {
-                opacity: 1
-            }
-
-            to {
-                opacity: 0.4
-            }
-        }
-
-        /* ── Skip button ── */
-        #skip-btn {
-            font-family: 'Share Tech Mono', monospace;
-            font-size: 0.62rem;
-            letter-spacing: 0.3em;
-            color: var(--dim);
-            background: none;
-            border: none;
-            cursor: pointer;
-            transition: color 0.2s;
-            padding: 0;
-        }
-
-        #skip-btn:hover {
-            color: #fff;
-        }
-
-        /* ── Icon toggle buttons ── */
-        .tog-btn {
-            font-family: 'Share Tech Mono', monospace;
-            font-size: 0.6rem;
-            letter-spacing: 0.15em;
-            color: var(--dim);
-            background: none;
-            border: 1px solid var(--dimmer);
-            cursor: pointer;
-            padding: 0.32rem 0.7rem;
-            transition: color 0.2s, border-color 0.2s;
-        }
-
-        .tog-btn:hover {
-            color: #888;
-            border-color: #444;
-        }
-
-        .tog-btn.on {
-            color: #fff;
-            border-color: var(--dim);
-        }
-
-        /* ── Edit settings button ── */
-        #edit-btn {
-            font-family: 'Share Tech Mono', monospace;
-            font-size: 0.62rem;
-            letter-spacing: 0.3em;
-            color: var(--dim);
-            background: none;
-            border: none;
-            cursor: pointer;
-            transition: color 0.2s;
-            text-transform: uppercase;
-        }
-
-        #edit-btn:hover:not(:disabled) {
-            color: #fff;
-        }
-
-        #edit-btn:disabled {
-            color: var(--dimmer);
-            cursor: not-allowed;
-        }
-
-        /* ── Settings panel ── */
-        #settings-panel {
-            border: 1px solid var(--dimmer);
-            padding: 1.4rem 1.8rem;
-            transition: opacity 0.25s, transform 0.25s;
-            width: 100%;
-        }
-
-        #settings-panel.hidden {
-            opacity: 0;
-            pointer-events: none;
-            transform: translateY(-10px);
-        }
-
-        .s-label {
-            font-size: 0.58rem;
-            letter-spacing: 0.28em;
-            color: var(--dim);
-            text-transform: uppercase;
-        }
-
-        .s-input {
-            font-family: 'Share Tech Mono', monospace;
-            background: transparent;
-            border: none;
-            border-bottom: 1px solid var(--dim);
-            color: #fff;
-            font-size: 1.35rem;
-            width: 3.4rem;
-            text-align: center;
-            outline: none;
-            padding: 0.15rem 0;
-            transition: border-color 0.2s;
-        }
-
-        .s-input:focus {
-            border-bottom-color: #fff;
-        }
-
-        .s-input:disabled {
-            color: var(--dimmer);
-            border-bottom-color: var(--dimmer);
-            cursor: not-allowed;
-        }
-
-        .s-input::-webkit-outer-spin-button,
-        .s-input::-webkit-inner-spin-button {
-            -webkit-appearance: none;
-        }
-
-        .s-input[type=number] {
-            -moz-appearance: textfield;
-        }
-
-        /* Toggle row */
-        .tog-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0.45rem 0;
-            font-size: 0.62rem;
-            letter-spacing: 0.22em;
-            color: var(--mid);
-            border-bottom: 1px solid var(--dimmer);
-        }
-
-        .tog-row:last-child {
-            border-bottom: none;
-        }
-
-        .sw {
-            width: 30px;
-            height: 16px;
-            border: 1px solid var(--dim);
-            position: relative;
-            cursor: pointer;
-            flex-shrink: 0;
-            transition: border-color 0.2s;
-            background: transparent;
-        }
-
-        .sw::after {
-            content: '';
-            position: absolute;
-            top: 3px;
-            left: 3px;
-            width: 8px;
-            height: 8px;
-            background: var(--dim);
-            transition: transform 0.2s, background 0.2s;
-        }
-
-        .sw.on {
-            border-color: #fff;
-        }
-
-        .sw.on::after {
-            transform: translateX(14px);
-            background: #fff;
-        }
-
-        /* Apply button */
-        #apply-btn {
-            font-family: 'Share Tech Mono', monospace;
-            font-size: 0.68rem;
-            letter-spacing: 0.22em;
-            background: #fff;
-            color: #000;
-            border: none;
-            padding: 0.48rem 1.3rem;
-            cursor: pointer;
-            transition: opacity 0.15s;
-        }
-
-        #apply-btn:hover {
-            opacity: 0.82;
-        }
-
-        /* Shortcuts */
-        #shortcuts {
-            font-size: 0.52rem;
-            letter-spacing: 0.15em;
-            color: #2a2a2a;
-            text-align: center;
-            line-height: 1.9;
-        }
-
-        /* Notification banner */
-        #notif-banner {
-            font-size: 0.58rem;
-            letter-spacing: 0.22em;
-            color: #444;
-            border: 1px solid var(--dimmer);
-            padding: 0.38rem 0.9rem;
-            cursor: pointer;
-            transition: color 0.2s, border-color 0.2s;
-            text-align: center;
-        }
-
-        #notif-banner:hover {
-            color: #888;
-            border-color: var(--dim);
-        }
-
-        #notif-banner.hidden {
-            display: none;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FOCUS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root { --dim: #444; --dimmer: #222; --mid: #888; }
+
+    body {
+      background: #000; color: #fff;
+      font-family: 'Share Tech Mono', 'Courier New', monospace;
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+    }
+
+    /* CRT scanlines */
+    body::before {
+      content: ''; position: fixed; inset: 0; z-index: 100; pointer-events: none;
+      background: repeating-linear-gradient(0deg,
+        transparent, transparent 2px,
+        rgba(255,255,255,0.013) 2px, rgba(255,255,255,0.013) 4px);
+    }
+
+    /* Vignette */
+    body::after {
+      content: ''; position: fixed; inset: 0; z-index: 99; pointer-events: none;
+      background: radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.85) 100%);
+    }
+
+    /* ── Timer display ── */
+    #timer-display {
+      font-size: clamp(4.5rem, 18vw, 11rem);
+      letter-spacing: 0.05em; line-height: 1;
+      transition: text-shadow 0.4s; user-select: none;
+    }
+    #timer-display.running {
+      text-shadow: 0 0 24px rgba(255,255,255,0.22), 0 0 70px rgba(255,255,255,0.07);
+    }
+    #timer-display.warning { animation: warn 0.45s ease-in-out infinite alternate; }
+    @keyframes warn { from { opacity: 1; } to { opacity: 0.3; } }
+    #timer-display.flash { animation: finish-flash 0.18s ease 3; }
+    @keyframes finish-flash { 0%,100% { opacity: 1; } 50% { opacity: 0.05; } }
+
+    /* ── Colon ── */
+    #colon { display: inline-block; }
+    #colon.blink      { animation: blink 1s    step-start infinite; }
+    #colon.blink-fast { animation: blink 0.28s step-start infinite; }
+    #colon.dimmed     { opacity: 0.2; animation: none; }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.1; } }
+
+    /* ── Mode badge ── */
+    #mode-badge { letter-spacing: 0.35em; font-size: 0.68rem; transition: color 0.4s; min-height: 1.1em; }
+
+    /* ── Status line ── */
+    #status-line { font-size: 0.62rem; letter-spacing: 0.3em; color: var(--mid); min-height: 1.1em; text-align: center; }
+
+    /* ── Progress bar ── */
+    #prog-track { height: 1px; background: var(--dimmer); width: 100%; max-width: 440px; }
+    #prog-fill  { height: 1px; background: #fff; width: 0%; transition: width 0.5s linear; box-shadow: 0 0 10px rgba(255,255,255,0.5); }
+
+    /* ── Session dots ── */
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dimmer); border: 1px solid var(--dim); transition: background 0.35s, border-color 0.35s; }
+    .dot.done   { background: #fff; border-color: #fff; }
+    .dot.active { background: transparent; border-color: #fff; animation: dot-pulse 0.9s ease infinite alternate; }
+    @keyframes dot-pulse { from { border-color: #fff; opacity: 1; } to { border-color: #444; opacity: 0.35; } }
+
+    /* ── Control buttons ── */
+    .ctrl-btn {
+      font-family: 'Share Tech Mono', monospace;
+      letter-spacing: 0.25em; font-size: 0.82rem;
+      border: 1px solid var(--dim); color: #fff; background: transparent;
+      padding: 0.58rem 1.5rem; cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.1s;
+    }
+    .ctrl-btn:hover:not(:disabled)  { background: #fff; color: #000; border-color: #fff; }
+    .ctrl-btn:active:not(:disabled) { transform: scale(0.95); }
+    .ctrl-btn:disabled { opacity: 0.18; cursor: not-allowed; }
+
+    #reset-btn.confirming { border-color: #fff; color: #fff; animation: confirm-blink 0.55s ease infinite alternate; }
+    @keyframes confirm-blink { from { opacity: 1; } to { opacity: 0.35; } }
+
+    /* ── Skip button ── */
+    #skip-btn {
+      font-family: 'Share Tech Mono', monospace; font-size: 0.62rem; letter-spacing: 0.3em;
+      color: var(--dim); background: none; border: none; cursor: pointer; transition: color 0.2s; padding: 0;
+    }
+    #skip-btn:hover { color: #fff; }
+
+    /* ── Toggle button ── */
+    .tog-btn {
+      font-family: 'Share Tech Mono', monospace; font-size: 0.6rem; letter-spacing: 0.15em;
+      color: var(--dim); background: none; border: 1px solid var(--dimmer); cursor: pointer;
+      padding: 0.32rem 0.8rem; transition: color 0.2s, border-color 0.2s;
+    }
+    .tog-btn:hover { color: #888; border-color: #444; }
+    .tog-btn.on    { color: #fff; border-color: var(--dim); }
+
+    /* ── Edit settings button ── */
+    #edit-btn {
+      font-family: 'Share Tech Mono', monospace; font-size: 0.62rem; letter-spacing: 0.3em;
+      color: var(--dim); background: none; border: none; cursor: pointer; transition: color 0.2s;
+    }
+    #edit-btn:hover:not(:disabled) { color: #fff; }
+    #edit-btn:disabled { color: var(--dimmer); cursor: not-allowed; }
+
+    /* ── Settings panel ── */
+    #settings-panel {
+      border: 1px solid var(--dimmer); padding: 1.4rem 1.8rem;
+      transition: opacity 0.25s, transform 0.25s; width: 100%;
+    }
+    #settings-panel.hidden { opacity: 0; pointer-events: none; transform: translateY(-10px); }
+
+    .s-label { font-size: 0.58rem; letter-spacing: 0.28em; color: var(--dim); text-transform: uppercase; }
+    .s-input {
+      font-family: 'Share Tech Mono', monospace; background: transparent; border: none;
+      border-bottom: 1px solid var(--dim); color: #fff; font-size: 1.35rem; width: 3.4rem;
+      text-align: center; outline: none; padding: 0.15rem 0; transition: border-color 0.2s;
+    }
+    .s-input:focus { border-bottom-color: #fff; }
+    .s-input::-webkit-outer-spin-button,
+    .s-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+    .s-input[type=number] { -moz-appearance: textfield; }
+
+    .tog-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.45rem 0; font-size: 0.62rem; letter-spacing: 0.22em;
+      color: var(--mid); border-bottom: 1px solid var(--dimmer);
+    }
+    .tog-row:last-child { border-bottom: none; }
+
+    .sw {
+      width: 30px; height: 16px; border: 1px solid var(--dim);
+      position: relative; cursor: pointer; flex-shrink: 0;
+      background: transparent; transition: border-color 0.2s;
+    }
+    .sw::after {
+      content: ''; position: absolute; top: 3px; left: 3px; width: 8px; height: 8px;
+      background: var(--dim); transition: transform 0.2s, background 0.2s;
+    }
+    .sw.on          { border-color: #fff; }
+    .sw.on::after   { transform: translateX(14px); background: #fff; }
+
+    #apply-btn {
+      font-family: 'Share Tech Mono', monospace; font-size: 0.68rem; letter-spacing: 0.22em;
+      background: #fff; color: #000; border: none; padding: 0.48rem 1.3rem;
+      cursor: pointer; transition: opacity 0.15s;
+    }
+    #apply-btn:hover { opacity: 0.8; }
+
+    /* ── Focus tracker ── */
+    #focus-tracker {
+      font-size: 0.58rem; letter-spacing: 0.25em;
+      color: #555; /* readable but subtle at zero */
+      text-align: center; transition: color 0.4s;
+    }
+    #focus-tracker.has-time { color: var(--mid); }
+
+    /* ── Shortcuts ── */
+    #shortcuts { font-size: 0.5rem; letter-spacing: 0.18em; color: #555; text-align: center; line-height: 2; }
+
+    /* ── Notification banner ── */
+    #notif-banner {
+      font-size: 0.58rem; letter-spacing: 0.22em; color: #444;
+      border: 1px solid var(--dimmer); padding: 0.38rem 0.9rem;
+      cursor: pointer; transition: color 0.2s, border-color 0.2s; text-align: center;
+    }
+    #notif-banner:hover  { color: #888; border-color: #444; }
+    #notif-banner.hidden { display: none; }
+  </style>
 </head>
-
 <body>
 
-    <div class="flex flex-col items-center gap-5 w-full px-5" style="max-width:570px">
+<div class="flex flex-col items-center gap-5 w-full px-5" style="max-width:570px">
 
-        <!-- NOTIFICATIONS BANNER -->
-        <div id="notif-banner" onclick="requestNotifPermission()">
-            [ ENABLE DESKTOP NOTIFICATIONS ]
-        </div>
+  <div id="notif-banner" onclick="requestNotifPermission()">[ ENABLE DESKTOP NOTIFICATIONS ]</div>
 
-        <!-- MODE BADGE -->
-        <div id="mode-badge" class="text-white">● WORK SESSION</div>
+  <div id="mode-badge">● WORK SESSION</div>
 
-        <!-- TIMER -->
-        <div id="timer-display" class="font-mono text-white">
-            <span id="mm">25</span><span id="colon">:</span><span id="ss">00</span>
-        </div>
+  <div id="timer-display" class="font-mono">
+    <span id="mm">25</span><span id="colon">:</span><span id="ss">00</span>
+  </div>
 
-        <!-- TRANSITION MESSAGE -->
-        <div id="trans-msg"></div>
+  <div id="status-line"></div>
 
-        <!-- PROGRESS BAR -->
-        <div id="prog-track">
-            <div id="prog-fill"></div>
-        </div>
+  <div id="prog-track"><div id="prog-fill"></div></div>
 
-        <!-- SESSION DOTS -->
-        <div id="dots" class="flex gap-3"></div>
+  <div id="dots" class="flex gap-3"></div>
 
-        <!-- SKIP -->
-        <button id="skip-btn" style="display:none" onclick="skipPhase()">[ SKIP → ]</button>
+  <button id="skip-btn" style="display:none" onclick="skipPhase()">[ SKIP → ]</button>
 
-        <!-- MAIN CONTROLS -->
-        <div class="flex gap-4">
-            <button class="ctrl-btn" id="start-btn" onclick="startTimer()">START</button>
-            <button class="ctrl-btn" id="pause-btn" onclick="pauseTimer()" disabled>PAUSE</button>
-            <button class="ctrl-btn" id="reset-btn" onclick="confirmReset()">RESET</button>
-        </div>
+  <div class="flex gap-4">
+    <button class="ctrl-btn" id="start-btn" onclick="startTimer()">START</button>
+    <button class="ctrl-btn" id="pause-btn" onclick="pauseTimer()" disabled>PAUSE</button>
+    <button class="ctrl-btn" id="reset-btn" onclick="confirmReset()">RESET</button>
+  </div>
 
-        <!-- SOUND / AMBIENT TOGGLES -->
-        <div class="flex gap-3">
-            <button class="tog-btn on" id="sound-btn" onclick="toggleSound()">♪ BEEP</button>
-            <button class="tog-btn" id="ambient-btn" onclick="toggleAmbient()">~ NOISE</button>
-        </div>
+  <div class="flex gap-3">
+    <button class="tog-btn on" id="sound-btn" onclick="toggleSound()">♪ BEEP</button>
+  </div>
 
-        <!-- EDIT SETTINGS -->
-        <button id="edit-btn" onclick="toggleSettings()">[ EDIT SETTINGS ]</button>
+  <div id="focus-tracker">FOCUSED TODAY · 0H 00M</div>
 
-        <!-- SETTINGS PANEL -->
-        <div id="settings-panel" class="hidden">
+  <button id="edit-btn" onclick="toggleSettings()">[ EDIT SETTINGS ]</button>
 
-            <div class="flex gap-5 justify-center items-end mb-5 flex-wrap">
-                <div class="flex flex-col items-center gap-2">
-                    <span class="s-label">Work (min)</span>
-                    <input class="s-input" id="inp-work" type="number" min="1" max="120" value="25" />
-                </div>
-                <div class="flex flex-col items-center gap-2">
-                    <span class="s-label">Break (min)</span>
-                    <input class="s-input" id="inp-break" type="number" min="1" max="60" value="5" />
-                </div>
-                <div class="flex flex-col items-center gap-2">
-                    <span class="s-label">Long Break (min)</span>
-                    <input class="s-input" id="inp-longbreak" type="number" min="1" max="60" value="15" />
-                </div>
-                <div class="flex flex-col items-center gap-2">
-                    <span class="s-label">Sessions</span>
-                    <input class="s-input" id="inp-sessions" type="number" min="1" max="8" value="4" />
-                </div>
-            </div>
-
-            <div class="mb-5" style="border-top:1px solid #222; padding-top:0.9rem">
-                <div class="tog-row">
-                    <span>AUTO-START PHASES</span>
-                    <div class="sw on" id="sw-autostart" onclick="toggleAutoStart()"></div>
-                </div>
-            </div>
-
-            <div class="flex justify-center">
-                <button id="apply-btn" onclick="applySettings()">APPLY</button>
-            </div>
-        </div>
-
-        <!-- KEYBOARD SHORTCUTS HINT -->
-        <div id="shortcuts">
-            SPACE · START / PAUSE &nbsp;|&nbsp; S · SKIP &nbsp;|&nbsp; R · RESET
-        </div>
-
+  <div id="settings-panel" class="hidden">
+    <div class="flex gap-5 justify-center items-end mb-5 flex-wrap">
+      <div class="flex flex-col items-center gap-2">
+        <span class="s-label">Work (min)</span>
+        <input class="s-input" id="inp-work"      type="number" min="1" max="120" value="25" />
+      </div>
+      <div class="flex flex-col items-center gap-2">
+        <span class="s-label">Break (min)</span>
+        <input class="s-input" id="inp-break"     type="number" min="1" max="60"  value="5"  />
+      </div>
+      <div class="flex flex-col items-center gap-2">
+        <span class="s-label">Long Break (min)</span>
+        <input class="s-input" id="inp-longbreak" type="number" min="1" max="60"  value="15" />
+      </div>
+      <div class="flex flex-col items-center gap-2">
+        <span class="s-label">Sessions</span>
+        <input class="s-input" id="inp-sessions"  type="number" min="1" max="8"   value="4"  />
+      </div>
     </div>
+    <div style="border-top:1px solid #222; padding-top:0.9rem" class="mb-5">
+      <div class="tog-row">
+        <span>AUTO-START PHASES</span>
+        <div class="sw on" id="sw-autostart" onclick="toggleAutoStart()"></div>
+      </div>
+    </div>
+    <div class="flex justify-center">
+      <button id="apply-btn" onclick="applySettings()">APPLY</button>
+    </div>
+  </div>
 
-    <script>
-        /* ══════════════════════════════════════════════════
-           CONFIG  (persisted to localStorage)
-        ══════════════════════════════════════════════════ */
-        const cfg = {
-            workMin: 25, breakMin: 5, longBreakMin: 15,
-            sessions: 4, sound: true, ambient: false, autoStart: true,
-        };
+  <div id="shortcuts">SPACE · START / PAUSE &nbsp;|&nbsp; S · SKIP &nbsp;|&nbsp; R · RESET</div>
 
-        /* ══════════════════════════════════════════════════
-           RUNTIME STATE
-        ══════════════════════════════════════════════════ */
-        let phase = 'work'; // 'work' | 'break' | 'longbreak'
-        let secondsLeft = cfg.workMin * 60;
-        let totalSeconds = cfg.workMin * 60;
-        let isRunning = false;
-        let isTransitioning = false;
-        let interval = null;
-        let sessionsDone = 0;
-        let resetConfirm = false;
-        let resetConfirmTid = null;
-        let transTid = null;
-        let settOpen = false;
+</div>
 
-        /* ══════════════════════════════════════════════════
-           DOM REFS
-        ══════════════════════════════════════════════════ */
-        const mmEl = document.getElementById('mm');
-        const ssEl = document.getElementById('ss');
-        const colonEl = document.getElementById('colon');
-        const dispEl = document.getElementById('timer-display');
-        const badgeEl = document.getElementById('mode-badge');
-        const transEl = document.getElementById('trans-msg');
-        const progEl = document.getElementById('prog-fill');
-        const dotsEl = document.getElementById('dots');
-        const startBtn = document.getElementById('start-btn');
-        const pauseBtn = document.getElementById('pause-btn');
-        const resetBtn = document.getElementById('reset-btn');
-        const skipBtn = document.getElementById('skip-btn');
-        const editBtn = document.getElementById('edit-btn');
-        const soundBtn = document.getElementById('sound-btn');
-        const ambientBtn = document.getElementById('ambient-btn');
-        const settPanel = document.getElementById('settings-panel');
-        const swAuto = document.getElementById('sw-autostart');
+<script>
+/* ═══════════════════════════════════════════
+   CONFIG
+═══════════════════════════════════════════ */
+const cfg = {
+  workMin: 25, breakMin: 5, longBreakMin: 15,
+  sessions: 4, sound: true, autoStart: true,
+};
 
-        /* ══════════════════════════════════════════════════
-           AUDIO — single shared AudioContext
-        ══════════════════════════════════════════════════ */
-        let _ctx = null, ambSrc = null, ambGain = null;
+/* ═══════════════════════════════════════════
+   RUNTIME STATE
+═══════════════════════════════════════════ */
+let phase            = 'work';
+let secondsLeft      = 0;
+let totalSeconds     = 0;
+let isRunning        = false;
+let isTransitioning  = false;
+let tickInterval     = null;
+let startTimestamp   = null;   // Date.now() anchor for drift-free calc
+let startSecondsLeft = 0;
+let sessionsDone     = 0;
+let focusedSeconds   = 0;
+let resetConfirm     = false;
+let resetConfirmTid  = null;
+let transTid         = null;
+let settOpen         = false;
 
-        function getCtx() {
-            if (!_ctx) _ctx = new (window.AudioContext || window.webkitAudioContext)();
-            if (_ctx.state === 'suspended') _ctx.resume();
-            return _ctx;
-        }
+/* ═══════════════════════════════════════════
+   DOM
+═══════════════════════════════════════════ */
+const mmEl      = document.getElementById('mm');
+const ssEl      = document.getElementById('ss');
+const colonEl   = document.getElementById('colon');
+const dispEl    = document.getElementById('timer-display');
+const badgeEl   = document.getElementById('mode-badge');
+const statusEl  = document.getElementById('status-line');
+const progEl    = document.getElementById('prog-fill');
+const dotsEl    = document.getElementById('dots');
+const startBtn  = document.getElementById('start-btn');
+const pauseBtn  = document.getElementById('pause-btn');
+const resetBtn  = document.getElementById('reset-btn');
+const skipBtn   = document.getElementById('skip-btn');
+const editBtn   = document.getElementById('edit-btn');
+const soundBtn  = document.getElementById('sound-btn');
+const settPanel = document.getElementById('settings-panel');
+const swAuto    = document.getElementById('sw-autostart');
+const focusEl   = document.getElementById('focus-tracker');
 
-        function beep() {
-            if (!cfg.sound) return;
-            try {
-                const ctx = getCtx();
-                [0, 0.28, 0.56].forEach(d => {
-                    const osc = ctx.createOscillator();
-                    const g = ctx.createGain();
-                    osc.connect(g); g.connect(ctx.destination);
-                    osc.type = 'square';
-                    const t = ctx.currentTime + d;
-                    osc.frequency.setValueAtTime(1480, t);
-                    g.gain.setValueAtTime(0, t);
-                    g.gain.linearRampToValueAtTime(0.32, t + 0.01);
-                    g.gain.setValueAtTime(0.32, t + 0.11);
-                    g.gain.linearRampToValueAtTime(0, t + 0.17);
-                    osc.start(t); osc.stop(t + 0.2);
-                });
-            } catch (e) { }
-        }
+/* ═══════════════════════════════════════════
+   AUDIO — single shared context + persistent
+   compressor chain (no node accumulation)
+═══════════════════════════════════════════ */
+let _ctx    = null;
+let _comp   = null;
+let _master = null;
 
-        function buildBrownNoise(ctx) {
-            const n = ctx.sampleRate * 4;
-            const buf = ctx.createBuffer(1, n, ctx.sampleRate);
-            const dat = buf.getChannelData(0);
-            let last = 0;
-            for (let i = 0; i < n; i++) {
-                const w = Math.random() * 2 - 1;
-                dat[i] = (last + 0.02 * w) / 1.02;
-                last = dat[i];
-                dat[i] *= 3.5;
-            }
-            const src = ctx.createBufferSource();
-            src.buffer = buf; src.loop = true;
-            return src;
-        }
+function getAudio() {
+  if (!_ctx) {
+    _ctx    = new (window.AudioContext || window.webkitAudioContext)();
+    _comp   = _ctx.createDynamicsCompressor();
+    _comp.threshold.value = -6;
+    _comp.knee.value      = 2;
+    _comp.ratio.value     = 8;
+    _comp.attack.value    = 0.001;
+    _comp.release.value   = 0.1;
+    _master = _ctx.createGain();
+    _master.gain.value    = 0.92;
+    _master.connect(_comp);
+    _comp.connect(_ctx.destination);
+  }
+  if (_ctx.state === 'suspended') _ctx.resume();
+  return _ctx;
+}
 
-        function startAmbient() {
-            try {
-                const ctx = getCtx();
-                _killAmb();
-                ambSrc = buildBrownNoise(ctx);
-                ambGain = ctx.createGain();
-                ambGain.gain.setValueAtTime(0.055, ctx.currentTime);
-                ambSrc.connect(ambGain); ambGain.connect(ctx.destination);
-                ambSrc.start();
-            } catch (e) { }
-        }
+function beep() {
+  if (!cfg.sound) return;
+  try {
+    const ctx = getAudio();
+    [0, 0.32, 0.64].forEach(offset => {
+      const t = ctx.currentTime + offset;
 
-        function _killAmb() {
-            if (ambSrc) { try { ambSrc.stop(); } catch (e) { } ambSrc = null; }
-        }
+      // Primary high tone — sharp digital alarm
+      const osc1 = ctx.createOscillator();
+      const g1   = ctx.createGain();
+      osc1.type = 'square';
+      osc1.frequency.setValueAtTime(1760, t);
+      g1.gain.setValueAtTime(0,    t);
+      g1.gain.linearRampToValueAtTime(0.85, t + 0.008);
+      g1.gain.setValueAtTime(0.85, t + 0.18);
+      g1.gain.linearRampToValueAtTime(0,    t + 0.26);
+      osc1.connect(g1);
+      g1.connect(_master);
+      osc1.start(t);
+      osc1.stop(t + 0.28);
 
-        function stopAmbient() {
-            if (!ambSrc || !ambGain || !_ctx) return;
-            try {
-                ambGain.gain.linearRampToValueAtTime(0, _ctx.currentTime + 0.35);
-                const ref = ambSrc; ambSrc = null;
-                setTimeout(() => { try { ref.stop(); } catch (e) { } }, 450);
-            } catch (e) { _killAmb(); }
-        }
+      // Sub tone — body and punch
+      const osc2 = ctx.createOscillator();
+      const g2   = ctx.createGain();
+      osc2.type = 'square';
+      osc2.frequency.setValueAtTime(880, t);
+      g2.gain.setValueAtTime(0,    t);
+      g2.gain.linearRampToValueAtTime(0.45, t + 0.008);
+      g2.gain.setValueAtTime(0.45, t + 0.18);
+      g2.gain.linearRampToValueAtTime(0,    t + 0.26);
+      osc2.connect(g2);
+      g2.connect(_master);
+      osc2.start(t);
+      osc2.stop(t + 0.28);
+    });
+  } catch(e) {}
+}
 
-        function toggleSound() {
-            cfg.sound = !cfg.sound;
-            soundBtn.classList.toggle('on', cfg.sound);
-            saveCfg();
-        }
+function toggleSound() {
+  cfg.sound = !cfg.sound;
+  soundBtn.classList.toggle('on', cfg.sound);
+  saveCfg();
+}
 
-        function toggleAmbient() {
-            cfg.ambient = !cfg.ambient;
-            ambientBtn.classList.toggle('on', cfg.ambient);
-            if (cfg.ambient) startAmbient(); else stopAmbient();
-            saveCfg();
-        }
+/* ═══════════════════════════════════════════
+   NOTIFICATIONS
+═══════════════════════════════════════════ */
+function checkNotifBanner() {
+  if (!('Notification' in window) || Notification.permission !== 'default') {
+    document.getElementById('notif-banner').classList.add('hidden');
+  }
+}
 
-        /* ══════════════════════════════════════════════════
-           NOTIFICATIONS
-        ══════════════════════════════════════════════════ */
-        function checkNotifBanner() {
-            if (!('Notification' in window) || Notification.permission !== 'default') {
-                document.getElementById('notif-banner').classList.add('hidden');
-            }
-        }
+function requestNotifPermission() {
+  if (!('Notification' in window)) return;
+  Notification.requestPermission().then(() => checkNotifBanner());
+}
 
-        function requestNotifPermission() {
-            if (!('Notification' in window)) return;
-            Notification.requestPermission().then(() => checkNotifBanner());
-        }
+function notify(title, body) {
+  try {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      new Notification(title, { body });
+    }
+  } catch(e) {}
+}
 
-        function notify(title, body) {
-            try {
-                if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-                    new Notification(title, { body });
-                }
-            } catch (e) { }
-        }
+/* ═══════════════════════════════════════════
+   FOCUS TIME TRACKER
+═══════════════════════════════════════════ */
+function todayKey() {
+  const d = new Date();
+  return `focus_day_${d.getFullYear()}_${d.getMonth()}_${d.getDate()}`;
+}
 
-        /* ══════════════════════════════════════════════════
-           LOCAL STORAGE
-        ══════════════════════════════════════════════════ */
-        function saveCfg() {
-            try { localStorage.setItem('focus_v3', JSON.stringify(cfg)); } catch (e) { }
-        }
+function addFocusedTime(secs) {
+  focusedSeconds += secs;
+  renderFocusTracker();
+  // Persist immediately — survives refresh
+  try { localStorage.setItem(todayKey(), String(focusedSeconds)); } catch(e) {}
+}
 
-        function loadCfg() {
-            try {
-                const raw = localStorage.getItem('focus_v3');
-                if (!raw) return;
-                Object.assign(cfg, JSON.parse(raw));
-                document.getElementById('inp-work').value = cfg.workMin;
-                document.getElementById('inp-break').value = cfg.breakMin;
-                document.getElementById('inp-longbreak').value = cfg.longBreakMin;
-                document.getElementById('inp-sessions').value = cfg.sessions;
-                soundBtn.classList.toggle('on', cfg.sound);
-                ambientBtn.classList.toggle('on', cfg.ambient);
-                swAuto.classList.toggle('on', cfg.autoStart);
-                if (cfg.ambient) startAmbient();
-            } catch (e) { }
-        }
+function renderFocusTracker() {
+  const h    = Math.floor(focusedSeconds / 3600);
+  const m    = Math.floor((focusedSeconds % 3600) / 60);
+  const mStr = String(m).padStart(2, '0');
+  focusEl.textContent = `FOCUSED TODAY · ${h}H ${mStr}M`;
+  focusEl.classList.toggle('has-time', focusedSeconds > 0);
+}
 
-        /* ══════════════════════════════════════════════════
-           RENDER
-        ══════════════════════════════════════════════════ */
-        const LABELS = { work: 'WORK', break: 'BREAK', longbreak: 'LONG BREAK' };
+function loadFocusTime() {
+  try {
+    const raw = localStorage.getItem(todayKey());
+    if (raw !== null) {
+      focusedSeconds = parseInt(raw) || 0;
+      renderFocusTracker();
+    }
+  } catch(e) {}
+}
 
-        function render() {
-            const m = Math.floor(secondsLeft / 60);
-            const s = secondsLeft % 60;
-            const mStr = String(m).padStart(2, '0');
-            const sStr = String(s).padStart(2, '0');
-            mmEl.textContent = mStr;
-            ssEl.textContent = sStr;
-            document.title = `${mStr}:${sStr} · ${LABELS[phase]}`;
+/* ═══════════════════════════════════════════
+   LOCAL STORAGE — config
+═══════════════════════════════════════════ */
+function saveCfg() {
+  try { localStorage.setItem('focus_v5', JSON.stringify(cfg)); } catch(e) {}
+}
 
-            const pct = ((totalSeconds - secondsLeft) / totalSeconds) * 100;
-            progEl.style.width = pct + '%';
+function loadCfg() {
+  try {
+    const raw = localStorage.getItem('focus_v5');
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    ['workMin','breakMin','longBreakMin','sessions','sound','autoStart'].forEach(k => {
+      if (saved[k] !== undefined) cfg[k] = saved[k];
+    });
+    document.getElementById('inp-work').value      = cfg.workMin;
+    document.getElementById('inp-break').value     = cfg.breakMin;
+    document.getElementById('inp-longbreak').value = cfg.longBreakMin;
+    document.getElementById('inp-sessions').value  = cfg.sessions;
+    soundBtn.classList.toggle('on', cfg.sound);
+    swAuto.classList.toggle('on', cfg.autoStart);
+  } catch(e) {}
+}
 
-            // Last-10s warning
-            if (isRunning && secondsLeft <= 10 && secondsLeft > 0) {
-                dispEl.classList.add('warning');
-                colonEl.className = 'blink-fast';
-            } else if (isRunning) {
-                dispEl.classList.remove('warning');
-                colonEl.className = 'blink';
-            }
-        }
+/* ═══════════════════════════════════════════
+   RENDER
+═══════════════════════════════════════════ */
+const LABELS = { work: 'WORK', break: 'BREAK', longbreak: 'LONG BREAK' };
 
-        function renderDots() {
-            dotsEl.innerHTML = '';
-            for (let i = 0; i < cfg.sessions; i++) {
-                const d = document.createElement('div');
-                if (i < sessionsDone) d.className = 'dot done';
-                else if (i === sessionsDone && phase === 'work' && isRunning) d.className = 'dot active';
-                else d.className = 'dot';
-                dotsEl.appendChild(d);
-            }
-        }
+function render() {
+  const m    = Math.floor(secondsLeft / 60);
+  const s    = secondsLeft % 60;
+  const mStr = String(m).padStart(2, '0');
+  const sStr = String(s).padStart(2, '0');
+  mmEl.textContent = mStr;
+  ssEl.textContent = sStr;
+  document.title   = `${mStr}:${sStr} · ${LABELS[phase]}`;
 
-        /* ══════════════════════════════════════════════════
-           BUTTON STATE HELPER
-        ══════════════════════════════════════════════════ */
-        function setBtns(start, pause, skip) {
-            startBtn.disabled = !start;
-            pauseBtn.disabled = !pause;
-            skipBtn.style.display = skip ? '' : 'none';
-        }
+  const pct = totalSeconds > 0 ? ((totalSeconds - secondsLeft) / totalSeconds) * 100 : 0;
+  progEl.style.width = pct + '%';
 
-        /* ══════════════════════════════════════════════════
-           TRANSITION COUNTDOWN  (fixes frozen 00:00 gap)
-        ══════════════════════════════════════════════════ */
-        function runTransition(label, onDone) {
-            isTransitioning = true;
-            setBtns(false, false, true);
-            editBtn.disabled = true;
+  if (isRunning && secondsLeft <= 10 && secondsLeft > 0) {
+    dispEl.classList.add('warning');
+    colonEl.className = 'blink-fast';
+  } else if (isRunning) {
+    dispEl.classList.remove('warning');
+    colonEl.className = 'blink';
+  }
+}
 
-            let n = 3;
-            function tick() {
-                transEl.textContent = `${label} IN ${n}...`;
-                document.title = `${label} IN ${n}...`;
-                if (n === 0) {
-                    transEl.textContent = '';
-                    isTransitioning = false;
-                    onDone();
-                } else {
-                    n--;
-                    transTid = setTimeout(tick, 1000);
-                }
-            }
-            tick();
-        }
+function renderDots() {
+  dotsEl.innerHTML = '';
+  for (let i = 0; i < cfg.sessions; i++) {
+    const d = document.createElement('div');
+    d.className = i < sessionsDone ? 'dot done'
+      : (i === sessionsDone && phase === 'work' && isRunning) ? 'dot active'
+      : 'dot';
+    dotsEl.appendChild(d);
+  }
+}
 
-        function cancelTransition() {
-            clearTimeout(transTid);
-            isTransitioning = false;
-            transEl.textContent = '';
-        }
+function resetProgressBar() {
+  progEl.style.transition = 'none';
+  progEl.style.width      = '0%';
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    progEl.style.transition = 'width 0.5s linear';
+  }));
+}
 
-        /* ══════════════════════════════════════════════════
-           CORE TIMER
-        ══════════════════════════════════════════════════ */
-        function startTimer() {
-            if (isRunning || isTransitioning) return;
+/* ═══════════════════════════════════════════
+   BUTTON STATE
+═══════════════════════════════════════════ */
+function setBtns(start, pause, skip) {
+  startBtn.disabled     = !start;
+  pauseBtn.disabled     = !pause;
+  skipBtn.style.display = skip ? '' : 'none';
+}
 
-            getCtx(); // init / resume AudioContext on user gesture
+/* ═══════════════════════════════════════════
+   DRIFT-FREE TICK
+   — setInterval fires even when tab is hidden
+   — Date.now() anchor prevents cumulative drift
+═══════════════════════════════════════════ */
+function tick() {
+  if (!isRunning) return;
 
-            // Clear pause visual state
-            colonEl.className = 'blink';
-            transEl.textContent = '';
+  const elapsed = Math.floor((Date.now() - startTimestamp) / 1000);
+  const newSecs = Math.max(0, startSecondsLeft - elapsed);
 
-            isRunning = true;
-            dispEl.classList.add('running');
-            dispEl.classList.remove('warning', 'flash');
-            setBtns(false, true, true);
-            editBtn.disabled = true;
-            renderDots();
+  if (newSecs !== secondsLeft) {
+    secondsLeft = newSecs;
+    render();
+    renderDots();
+  }
 
-            interval = setInterval(() => {
-                secondsLeft--;
-                render();
-                renderDots();
+  if (secondsLeft <= 0) {
+    stopTick();
+    isRunning = false;
+    dispEl.classList.remove('running', 'warning');
+    colonEl.className = '';
 
-                if (secondsLeft <= 0) {
-                    clearInterval(interval);
-                    isRunning = false;
-                    dispEl.classList.remove('running', 'warning');
-                    colonEl.className = '';
+    if (phase === 'work') addFocusedTime(totalSeconds); // credit full completed session
 
-                    dispEl.classList.add('flash');
-                    setTimeout(() => dispEl.classList.remove('flash'), 600);
-                    beep();
-                    setTimeout(handlePhaseEnd, 700);
-                }
-            }, 1000);
-        }
+    dispEl.classList.add('flash');
+    setTimeout(() => dispEl.classList.remove('flash'), 600);
+    beep();
+    setTimeout(handlePhaseEnd, 700);
+  }
+}
 
-        function pauseTimer() {
-            if (!isRunning) return;
-            isRunning = false;
-            clearInterval(interval);
-            dispEl.classList.remove('running', 'warning');
-            colonEl.className = 'dimmed';
-            transEl.textContent = '— PAUSED —';
-            setBtns(true, false, true);
-        }
+function stopTick() {
+  if (tickInterval) { clearInterval(tickInterval); tickInterval = null; }
+}
 
-        function skipPhase() {
-            if (!isRunning && !isTransitioning) return;
-            clearInterval(interval);
-            cancelTransition();
-            isRunning = false;
-            dispEl.classList.remove('running', 'warning');
-            colonEl.className = '';
-            transEl.textContent = '';
-            beep();
-            setTimeout(handlePhaseEnd, 300);
-        }
+// Snap display when returning to tab after timer expired while hidden
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && isRunning) tick();
+});
 
-        /* ══════════════════════════════════════════════════
-           PHASE TRANSITION LOGIC
-        ══════════════════════════════════════════════════ */
-        function handlePhaseEnd() {
-            if (phase === 'work') {
-                sessionsDone++;
-                renderDots();
+/* ═══════════════════════════════════════════
+   CORE TIMER
+═══════════════════════════════════════════ */
+function startTimer() {
+  if (isRunning || isTransitioning) return;
+  getAudio(); // init AudioContext on user gesture
 
-                if (sessionsDone >= cfg.sessions) {
-                    // All sessions → long break
-                    phase = 'longbreak';
-                    secondsLeft = cfg.longBreakMin * 60;
-                    totalSeconds = cfg.longBreakMin * 60;
-                    badgeEl.textContent = '◎ LONG BREAK';
-                    badgeEl.style.color = '#888';
-                    notify('🎉 All sessions complete!', `Enjoy your ${cfg.longBreakMin} min long break.`);
-                } else {
-                    phase = 'break';
-                    secondsLeft = cfg.breakMin * 60;
-                    totalSeconds = cfg.breakMin * 60;
-                    badgeEl.textContent = '○ BREAK';
-                    badgeEl.style.color = '#888';
-                    notify('✓ Work session done!', `Take a ${cfg.breakMin} min break.`);
-                }
+  colonEl.className    = 'blink';
+  statusEl.textContent = '';
+  isRunning            = true;
+  startTimestamp       = Date.now();
+  startSecondsLeft     = secondsLeft;
 
-            } else if (phase === 'break') {
-                phase = 'work';
-                secondsLeft = cfg.workMin * 60;
-                totalSeconds = cfg.workMin * 60;
-                badgeEl.textContent = '● WORK SESSION';
-                badgeEl.style.color = '#fff';
-                notify('⏱ Break over.', 'Time to focus!');
+  dispEl.classList.add('running');
+  dispEl.classList.remove('warning', 'flash');
+  setBtns(false, true, true);
+  editBtn.disabled = true;
+  renderDots();
 
-            } else if (phase === 'longbreak') {
-                // Long break ends → fresh cycle
-                sessionsDone = 0;
-                phase = 'work';
-                secondsLeft = cfg.workMin * 60;
-                totalSeconds = cfg.workMin * 60;
-                badgeEl.textContent = '● WORK SESSION';
-                badgeEl.style.color = '#fff';
-                notify('✓ Long break done.', 'Starting a fresh set!');
-                renderDots();
-            }
+  tickInterval = setInterval(tick, 250);
+}
 
-            // Smooth progress bar reset — no hard jump
-            progEl.style.transition = 'none';
-            progEl.style.width = '0%';
-            setTimeout(() => { progEl.style.transition = 'width 0.6s linear'; }, 40);
+function pauseTimer() {
+  if (!isRunning) return;
+  isRunning = false;
+  stopTick();
+  dispEl.classList.remove('running', 'warning');
+  colonEl.className    = 'dimmed';
+  statusEl.textContent = '— PAUSED —';
+  setBtns(true, false, true);
+}
 
-            render();
+function skipPhase() {
+  if (!isRunning && !isTransitioning) return;
+  const wasRunning = isRunning; // save BEFORE clearing — fix dead-code bug
+  stopTick();
+  cancelTransition();
+  isRunning = false;
+  dispEl.classList.remove('running', 'warning');
+  colonEl.className    = '';
+  statusEl.textContent = '';
 
-            if (cfg.autoStart) {
-                runTransition(LABELS[phase], startTimer);
-            } else {
-                editBtn.disabled = false;
-                setBtns(true, false, false);
-            }
-        }
+  // Credit only the time actually elapsed during this work segment
+  if (phase === 'work' && wasRunning) {
+    const elapsed = totalSeconds - secondsLeft;
+    if (elapsed > 0) addFocusedTime(elapsed);
+  }
 
-        /* ══════════════════════════════════════════════════
-           RESET  (double-confirm when timer is active)
-        ══════════════════════════════════════════════════ */
-        function confirmReset() {
-            // If completely idle → reset with no confirm needed
-            if (!isRunning && !isTransitioning && secondsLeft === totalSeconds && sessionsDone === 0) {
-                doReset(); return;
-            }
+  beep();
+  setTimeout(handlePhaseEnd, 300);
+}
 
-            if (!resetConfirm) {
-                resetConfirm = true;
-                resetBtn.textContent = 'SURE?';
-                resetBtn.classList.add('confirming');
-                resetConfirmTid = setTimeout(() => {
-                    resetConfirm = false;
-                    resetBtn.textContent = 'RESET';
-                    resetBtn.classList.remove('confirming');
-                }, 3000);
-            } else {
-                clearTimeout(resetConfirmTid);
-                resetConfirm = false;
-                resetBtn.textContent = 'RESET';
-                resetBtn.classList.remove('confirming');
-                doReset();
-            }
-        }
+/* ═══════════════════════════════════════════
+   PHASE LOGIC
+═══════════════════════════════════════════ */
+function handlePhaseEnd() {
+  if (phase === 'work') {
+    sessionsDone++;
+    renderDots();
+    if (sessionsDone >= cfg.sessions) {
+      phase        = 'longbreak';
+      secondsLeft  = cfg.longBreakMin * 60;
+      totalSeconds = cfg.longBreakMin * 60;
+      badgeEl.textContent = '◎ LONG BREAK';
+      badgeEl.style.color = '#888';
+      notify('🎉 All sessions complete!', `Enjoy your ${cfg.longBreakMin} min long break.`);
+    } else {
+      phase        = 'break';
+      secondsLeft  = cfg.breakMin * 60;
+      totalSeconds = cfg.breakMin * 60;
+      badgeEl.textContent = '○ BREAK';
+      badgeEl.style.color = '#888';
+      notify('✓ Work session done!', `Take a ${cfg.breakMin} min break.`);
+    }
+  } else if (phase === 'break') {
+    phase        = 'work';
+    secondsLeft  = cfg.workMin * 60;
+    totalSeconds = cfg.workMin * 60;
+    badgeEl.textContent = '● WORK SESSION';
+    badgeEl.style.color = '#fff';
+    notify('⏱ Break over.', 'Time to focus!');
+  } else if (phase === 'longbreak') {
+    sessionsDone = 0;
+    phase        = 'work';
+    secondsLeft  = cfg.workMin * 60;
+    totalSeconds = cfg.workMin * 60;
+    badgeEl.textContent = '● WORK SESSION';
+    badgeEl.style.color = '#fff';
+    notify('✓ Long break done.', 'Starting a fresh set!');
+    renderDots();
+  }
 
-        function doReset() {
-            clearInterval(interval);
-            cancelTransition();
-            isRunning = false;
-            phase = 'work';
-            sessionsDone = 0;
-            secondsLeft = cfg.workMin * 60;
-            totalSeconds = cfg.workMin * 60;
+  resetProgressBar();
+  render();
 
-            dispEl.classList.remove('running', 'warning', 'flash');
-            colonEl.className = '';
-            transEl.textContent = '';
-            badgeEl.textContent = '● WORK SESSION';
-            badgeEl.style.color = '#fff';
+  if (cfg.autoStart) {
+    runTransition(LABELS[phase], startTimer);
+  } else {
+    editBtn.disabled = false;
+    setBtns(true, false, false);
+  }
+}
 
-            progEl.style.transition = 'none';
-            progEl.style.width = '0%';
-            setTimeout(() => { progEl.style.transition = 'width 0.6s linear'; }, 40);
+/* ═══════════════════════════════════════════
+   TRANSITION COUNTDOWN
+═══════════════════════════════════════════ */
+function runTransition(label, onDone) {
+  isTransitioning = true;
+  setBtns(false, false, true);
+  editBtn.disabled = true;
+  let n = 3;
+  function countdown() {
+    statusEl.textContent = `${label} IN ${n}...`;
+    document.title       = `${label} IN ${n}...`;
+    if (n === 0) {
+      statusEl.textContent = '';
+      isTransitioning = false;
+      onDone();
+    } else {
+      n--;
+      transTid = setTimeout(countdown, 1000);
+    }
+  }
+  countdown();
+}
 
-            setBtns(true, false, false);
-            editBtn.disabled = false;
-            renderDots();
-            render();
-            document.title = 'FOCUS';
-        }
+function cancelTransition() {
+  clearTimeout(transTid);
+  isTransitioning      = false;
+  statusEl.textContent = '';
+}
 
-        /* ══════════════════════════════════════════════════
-           SETTINGS
-        ══════════════════════════════════════════════════ */
-        function toggleSettings() {
-            if (isRunning || isTransitioning) return; // locked while running
-            settOpen = !settOpen;
-            settPanel.classList.toggle('hidden', !settOpen);
-        }
+/* ═══════════════════════════════════════════
+   RESET — double-confirm when active
+═══════════════════════════════════════════ */
+function confirmReset() {
+  const isIdle = !isRunning && !isTransitioning
+               && secondsLeft === totalSeconds && sessionsDone === 0;
+  if (isIdle) { doReset(); return; }
 
-        function applySettings() {
-            const clamp = (id, lo, hi) =>
-                Math.min(Math.max(parseInt(document.getElementById(id).value) || lo, lo), hi);
+  if (!resetConfirm) {
+    resetConfirm = true;
+    resetBtn.textContent = 'SURE?';
+    resetBtn.classList.add('confirming');
+    resetConfirmTid = setTimeout(() => {
+      resetConfirm = false;
+      resetBtn.textContent = 'RESET';
+      resetBtn.classList.remove('confirming');
+    }, 3000);
+  } else {
+    clearTimeout(resetConfirmTid);
+    doReset();
+  }
+}
 
-            cfg.workMin = clamp('inp-work', 1, 120);
-            cfg.breakMin = clamp('inp-break', 1, 60);
-            cfg.longBreakMin = clamp('inp-longbreak', 1, 60);
-            cfg.sessions = clamp('inp-sessions', 1, 8);
+function doReset() {
+  stopTick();
+  cancelTransition();
+  // Always clean confirm state — prevents button getting stuck as "SURE?"
+  clearTimeout(resetConfirmTid);
+  resetConfirm = false;
+  resetBtn.textContent = 'RESET';
+  resetBtn.classList.remove('confirming');
 
-            document.getElementById('inp-work').value = cfg.workMin;
-            document.getElementById('inp-break').value = cfg.breakMin;
-            document.getElementById('inp-longbreak').value = cfg.longBreakMin;
-            document.getElementById('inp-sessions').value = cfg.sessions;
+  isRunning    = false;
+  phase        = 'work';
+  sessionsDone = 0;
+  secondsLeft  = cfg.workMin * 60;
+  totalSeconds = cfg.workMin * 60;
 
-            saveCfg();
-            doReset();
-            settOpen = false;
-            settPanel.classList.add('hidden');
-        }
+  dispEl.classList.remove('running', 'warning', 'flash');
+  colonEl.className    = '';
+  statusEl.textContent = '';
+  badgeEl.textContent  = '● WORK SESSION';
+  badgeEl.style.color  = '#fff';
 
-        // Live clamp inputs while typing
-        ['inp-work', 'inp-break', 'inp-longbreak', 'inp-sessions'].forEach(id => {
-            document.getElementById(id).addEventListener('input', function () {
-                const lo = parseInt(this.min), hi = parseInt(this.max), v = parseInt(this.value);
-                if (!isNaN(v)) {
-                    if (v < lo) this.value = lo;
-                    if (v > hi) this.value = hi;
-                }
-            });
-        });
+  resetProgressBar();
+  setBtns(true, false, false);
+  editBtn.disabled = false;
+  renderDots();
+  render();
+  document.title = 'FOCUS';
+}
 
-        function toggleAutoStart() {
-            cfg.autoStart = !cfg.autoStart;
-            swAuto.classList.toggle('on', cfg.autoStart);
-            saveCfg();
-        }
+/* ═══════════════════════════════════════════
+   SETTINGS
+═══════════════════════════════════════════ */
+function toggleSettings() {
+  if (isRunning || isTransitioning) return;
+  settOpen = !settOpen;
+  settPanel.classList.toggle('hidden', !settOpen);
+}
 
-        /* ══════════════════════════════════════════════════
-           KEYBOARD SHORTCUTS
-        ══════════════════════════════════════════════════ */
-        document.addEventListener('keydown', e => {
-            if (e.target.tagName === 'INPUT') return;
+function applySettings() {
+  const clamp = (id, lo, hi) =>
+    Math.min(Math.max(parseInt(document.getElementById(id).value) || lo, lo), hi);
+  cfg.workMin      = clamp('inp-work',      1, 120);
+  cfg.breakMin     = clamp('inp-break',     1,  60);
+  cfg.longBreakMin = clamp('inp-longbreak', 1,  60);
+  cfg.sessions     = clamp('inp-sessions',  1,   8);
+  document.getElementById('inp-work').value      = cfg.workMin;
+  document.getElementById('inp-break').value     = cfg.breakMin;
+  document.getElementById('inp-longbreak').value = cfg.longBreakMin;
+  document.getElementById('inp-sessions').value  = cfg.sessions;
+  saveCfg();
+  doReset();
+  settOpen = false;
+  settPanel.classList.add('hidden');
+}
 
-            if (e.code === 'Space') {
-                e.preventDefault();
-                if (isRunning) pauseTimer();
-                else if (!isTransitioning) startTimer();
-            }
-            if (e.key.toLowerCase() === 's') {
-                if (isRunning || isTransitioning) skipPhase();
-            }
-            if (e.key.toLowerCase() === 'r') {
-                confirmReset();
-            }
-        });
+// Live-clamp inputs while typing
+['inp-work','inp-break','inp-longbreak','inp-sessions'].forEach(id => {
+  document.getElementById(id).addEventListener('input', function() {
+    const lo = parseInt(this.min), hi = parseInt(this.max), v = parseInt(this.value);
+    if (!isNaN(v)) {
+      if (v < lo) this.value = lo;
+      if (v > hi) this.value = hi;
+    }
+  });
+});
 
-        /* ══════════════════════════════════════════════════
-           INIT
-        ══════════════════════════════════════════════════ */
-        loadCfg();
-        secondsLeft = cfg.workMin * 60;
-        totalSeconds = cfg.workMin * 60;
-        checkNotifBanner();
-        renderDots();
-        render();
-    </script>
+function toggleAutoStart() {
+  cfg.autoStart = !cfg.autoStart;
+  swAuto.classList.toggle('on', cfg.autoStart);
+  saveCfg();
+}
+
+/* ═══════════════════════════════════════════
+   KEYBOARD SHORTCUTS
+═══════════════════════════════════════════ */
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (isRunning) pauseTimer();
+    else if (!isTransitioning) startTimer();
+  }
+  if (e.key.toLowerCase() === 's' && (isRunning || isTransitioning)) skipPhase();
+  if (e.key.toLowerCase() === 'r') confirmReset();
+});
+
+/* ═══════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════ */
+loadCfg();
+loadFocusTime();
+secondsLeft  = cfg.workMin * 60;
+totalSeconds = cfg.workMin * 60;
+checkNotifBanner();
+renderDots();
+render();
+renderFocusTracker();
+</script>
 </body>
-
 </html>
